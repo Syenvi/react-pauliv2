@@ -46,13 +46,10 @@ export function MobileQuestionGrid({
   return (
    <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
   {/* Questions Grid - 3 columns for mobile */}
-  <div 
-    className="overflow-x-auto overflow-y-auto max-h-[80vh]" 
-    ref={scrollContainerRef}
-  >
-    <div className="flex gap-2 justify-center w-[max-content]">
-      {Array.from({ length: totalColumns }, (_, colIndex) => (
-        <div key={colIndex} className="flex flex-col gap-1 flex-shrink-0">
+<div className="overflow-x-auto overflow-y-auto max-h-[80vh]" ref={scrollContainerRef}>
+  <div className="flex gap-2 min-w-max">
+    {Array.from({ length: totalColumns }, (_, colIndex) => (
+      <div key={colIndex} className="flex flex-col gap-1 flex-shrink-0">
           {/* Column header */}
           <div className="text-center text-sm text-gray-500 mb-1 h-6 font-semibold">
             {colIndex + 1}
