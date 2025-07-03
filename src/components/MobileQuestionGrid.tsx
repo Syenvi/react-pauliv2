@@ -20,7 +20,6 @@ export function MobileQuestionGrid({
   disabled 
 }: MobileQuestionGridProps) {
   const [currentColumnPair, setCurrentColumnPair] = useState(0);
-  const [focusedQuestionIndex, setFocusedQuestionIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   const questionsPerColumn = 25;
@@ -34,12 +33,12 @@ export function MobileQuestionGrid({
     if (targetColumnPair !== currentColumnPair) {
       setCurrentColumnPair(targetColumnPair);
     }
-  }, [currentQuestionIndex, questionsPerColumn, columnsPerPage]);
+  }, [currentQuestionIndex, questionsPerColumn, columnsPerPage, currentColumnPair]);
   
   // Auto-scroll to focused question
   useEffect(() => {
     if (scrollContainerRef.current) {
-      const focusedElement = scrollContainerRef.current.querySelector(`[data-question-index="${focusedQuestionIndex}"]`);
+      const focusedElement = scrollContainerRef.current.querySelector(`[data-question-index="${currentQuestionIndex}"]`);
       if (focusedElement) {
         focusedElement.scrollIntoView({ 
           behavior: 'smooth', 
@@ -48,14 +47,7 @@ export function MobileQuestionGrid({
         });
       }
     }
-  }, [focusedQuestionIndex, currentColumnPair]);
-  
-  const handleQuestionClick = (questionIndex: number) => {
-    if (!disabled) {
-      setFocusedQuestionIndex(questionIndex);
-      onQuestionChange(questionIndex);
-    }
-  };
+  }, [currentQuestionIndex, currentColumnPair]);
   
   const handleAnswer = (questionId: string, answer: string, questionIndex: number) => {
     onAnswer(questionId, answer);
@@ -92,7 +84,6 @@ export function MobileQuestionGrid({
       // Ensure we don't go beyond available questions
       if (nextQuestionIndex < questions.length) {
         setTimeout(() => {
-          setFocusedQuestionIndex(nextQuestionIndex);
           onQuestionChange(nextQuestionIndex);
         }, 100);
       }
@@ -105,7 +96,6 @@ export function MobileQuestionGrid({
       // Move focus to first question of new column pair
       const newFocusIndex = (currentColumnPair + 1) * columnsPerPage * questionsPerColumn;
       if (newFocusIndex < questions.length) {
-        setFocusedQuestionIndex(newFocusIndex);
         onQuestionChange(newFocusIndex);
       }
     }
@@ -116,7 +106,6 @@ export function MobileQuestionGrid({
       setCurrentColumnPair(currentColumnPair - 1);
       // Move focus to first question of previous column pair
       const newFocusIndex = (currentColumnPair - 1) * columnsPerPage * questionsPerColumn;
-      setFocusedQuestionIndex(newFocusIndex);
       onQuestionChange(newFocusIndex);
     }
   };
@@ -175,7 +164,7 @@ export function MobileQuestionGrid({
                   
                   const question = questions[questionIndex];
                   const existingAnswer = answers.find(a => a.questionId === question.id);
-                  const isFocused = questionIndex === focusedQuestionIndex;
+                  const isFocused = questionIndex === currentQuestionIndex;
                   
                   return (
                     <div key={question.id} className="relative" data-question-index={questionIndex}>
@@ -188,14 +177,11 @@ export function MobileQuestionGrid({
                         </div>
                       )}
                       
-                      <div 
-                        className={`border-2 flex cursor-pointer transition-all duration-200 ${
-                          isFocused 
-                            ? 'border-blue-500 bg-blue-50 shadow-lg scale-105' 
-                            : 'border-gray-300 bg-white hover:border-gray-400'
-                        }`}
-                        onClick={() => handleQuestionClick(questionIndex)}
-                      >
+                      <div className={`border-2 flex transition-all duration-200 ${
+                        isFocused 
+                          ? 'border-blue-500 bg-blue-50 shadow-lg' 
+                          : 'border-gray-300 bg-white'
+                      }`}>
                         {/* Question numbers stacked vertically */}
                         <div className="w-12 h-20 flex flex-col border-r border-gray-300">
                           <div className="text-center text-sm font-mono py-1 border-b border-gray-200 flex-1 flex items-center justify-center">
@@ -206,31 +192,28 @@ export function MobileQuestionGrid({
                           </div>
                         </div>
                         
-                        {/* Answer display */}
-                        <div className="w-12 h-20 relative flex items-center justify-center">
-                          <div className={`text-xl font-mono font-bold ${
-                            existingAnswer?.answer 
-                              ? (existingAnswer.isCorrect ? 'text-green-600' : 'text-red-600')
-                              : 'text-gray-400'
-                          }`}>
-                            {existingAnswer?.answer || '?'}
-                          </div>
+                        {/* Answer input - same as desktop */}
+                        <div className="w-12 h-20 relative">
+                          <input
+                            type="text"
+                            value={existingAnswer?.answer || ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value.length > 1) return;
+                              if (value !== '' && (isNaN(Number(value)) || Number(value) < 0 || Number(value) > 9)) return;
+                              
+                              handleAnswer(question.id, value, questionIndex);
+                            }}
+                            disabled={disabled}
+                            maxLength={1}
+                            className="w-full h-full text-center font-mono text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400 focus:bg-blue-50"
+                            placeholder=""
+                            style={{ fontSize: '16px' }} // Prevent zoom on iOS
+                          />
                           
-                          {/* Status indicators */}
-                          <div className="absolute top-1 right-1 flex flex-col gap-1">
-                            {existingAnswer?.answer && (
-                              <div className={`w-2 h-2 rounded-full ${
-                                existingAnswer.isCorrect ? 'bg-green-500' : 'bg-red-500'
-                              }`} />
-                            )}
-                            {existingAnswer?.wasChanged && (
-                              <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
-                            )}
-                          </div>
-                          
-                          {/* Focus indicator */}
-                          {isFocused && (
-                            <div className="absolute inset-0 border-2 border-blue-400 rounded-sm animate-pulse" />
+                          {/* Only show correction indicator */}
+                          {existingAnswer?.wasChanged && (
+                            <div className="absolute -right-0.5 -top-0.5 w-1.5 h-1.5 bg-orange-500 rounded-full" />
                           )}
                         </div>
                       </div>
@@ -247,11 +230,11 @@ export function MobileQuestionGrid({
       <div className="mt-4 bg-gray-200 rounded-full h-2">
         <div 
           className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-          style={{ width: `${((focusedQuestionIndex + 1) / questions.length) * 100}%` }}
+          style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
         />
       </div>
       <div className="text-center text-xs text-gray-500 mt-1">
-        Soal {focusedQuestionIndex + 1} dari {questions.length}
+        Soal {currentQuestionIndex + 1} dari {questions.length}
       </div>
       
       {/* Navigation Instructions */}

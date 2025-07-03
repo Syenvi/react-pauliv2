@@ -1,20 +1,17 @@
 import React from 'react';
-import { Delete, ArrowRight } from 'lucide-react';
 
 interface MobileKeyboardProps {
   onNumberPress: (number: string) => void;
-  onDelete: () => void;
-  onNext: () => void;
 }
 
-export function MobileKeyboard({ onNumberPress, onDelete, onNext }: MobileKeyboardProps) {
+export function MobileKeyboard({ onNumberPress }: MobileKeyboardProps) {
   const numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
   
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-300 p-4 z-50 md:hidden shadow-2xl">
       <div className="max-w-sm mx-auto">
         {/* Numbers Grid */}
-        <div className="grid grid-cols-5 gap-2 mb-3">
+        <div className="grid grid-cols-5 gap-2">
           {numbers.map((number) => (
             <button
               key={number}
@@ -24,24 +21,6 @@ export function MobileKeyboard({ onNumberPress, onDelete, onNext }: MobileKeyboa
               {number}
             </button>
           ))}
-        </div>
-        
-        {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={onDelete}
-            className="bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-semibold py-3 rounded-lg transition-all duration-150 shadow-md flex items-center justify-center gap-2 active:scale-95"
-          >
-            <Delete className="w-5 h-5" />
-            Hapus
-          </button>
-          <button
-            onClick={onNext}
-            className="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white font-semibold py-3 rounded-lg transition-all duration-150 shadow-md flex items-center justify-center gap-2 active:scale-95"
-          >
-            <ArrowRight className="w-5 h-5" />
-            Lanjut
-          </button>
         </div>
       </div>
     </div>

@@ -13,8 +13,8 @@ import { RotateCcw } from 'lucide-react';
 function App() {
   const [testState, setTestState] = useState<TestState>({
     isActive: false,
-    currentSession: 0, // Will be set dynamically
-    timeRemaining: 0, // Will be set dynamically
+    currentSession: 0,
+    timeRemaining: 0,
     sessions: [],
     isCompleted: false,
     config: {
@@ -46,7 +46,7 @@ function App() {
     if (testState.currentSession !== previousSession && testState.isActive) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setPreviousSession(testState.currentSession);
-      setCurrentQuestionIndex(0); // Reset to first question
+      setCurrentQuestionIndex(0);
       
       // Focus on first input after scroll (desktop only)
       if (!isMobile) {
@@ -105,7 +105,7 @@ function App() {
   const handleStart = (config: TestConfig) => {
     setTestState({
       isActive: true,
-      currentSession: config.totalSessions, // Start from total, countdown to 1
+      currentSession: config.totalSessions,
       timeRemaining: config.sessionDuration,
       sessions: [],
       isCompleted: false,
@@ -130,32 +130,18 @@ function App() {
     const question = currentQuestions.find(q => q.id === questionId);
     if (!question) return;
     
-    console.log(`=== HANDLE ANSWER ===`);
-    console.log(`Question: ${question.num1} + ${question.num2} = ${question.correctAnswer}`);
-    console.log(`New answer: "${answer}"`);
-    
     const isCorrect = answer !== '' && parseInt(answer) === question.correctAnswer;
-    console.log(`Is correct: ${isCorrect}`);
     
     setCurrentAnswers(prev => {
       const existingIndex = prev.findIndex(a => a.questionId === questionId);
       const existingAnswer = existingIndex >= 0 ? prev[existingIndex] : null;
       
-      console.log(`Existing answer:`, existingAnswer);
-      
-      // Logika pembetulan yang sederhana:
-      // Pembetulan terjadi jika jawaban sebelumnya salah dan jawaban baru benar
+      // Correction logic: correction occurs if previous answer was wrong and new answer is correct
       let wasChanged = false;
       
       if (existingAnswer) {
-        console.log(`Previous answer: "${existingAnswer.answer}", was correct: ${existingAnswer.isCorrect}`);
-        
-        // Pembetulan terjadi jika:
-        // 1. Jawaban sebelumnya salah
-        // 2. Jawaban baru benar
         if (!existingAnswer.isCorrect && isCorrect) {
           wasChanged = true;
-          console.log(`🎯 PEMBETULAN DETECTED! Changed from "${existingAnswer.answer}" (wrong) to "${answer}" (correct)`);
         }
       }
       
@@ -166,9 +152,6 @@ function App() {
         wasChanged,
         timestamp: Date.now()
       };
-      
-      console.log(`New answer object:`, newAnswer);
-      console.log(`===================`);
       
       if (existingIndex >= 0) {
         const updated = [...prev];
@@ -220,22 +203,6 @@ function App() {
     if (currentQuestionIndex < currentQuestions.length) {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
-      
-      // The auto-advance is now handled in MobileQuestionGrid
-    }
-  };
-  
-  const handleMobileDelete = () => {
-    if (currentQuestionIndex < currentQuestions.length) {
-      const question = currentQuestions[currentQuestionIndex];
-      handleAnswer(question.id, '');
-    }
-  };
-  
-  const handleMobileNext = () => {
-    // Manual next - move to next question without answering
-    if (currentQuestionIndex < currentQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
   
@@ -289,16 +256,7 @@ function App() {
   const answeredQuestions = currentAnswers.filter(a => a.answer !== '');
   const correctAnswers = currentAnswers.filter(a => a.isCorrect && a.answer !== '');
   const corrections = currentAnswers.filter(a => a.wasChanged);
-  
-  // Wrong answers: answered but not correct AND not a correction
   const wrongAnswers = answeredQuestions.filter(a => !a.isCorrect && !a.wasChanged);
-  
-  console.log(`Current stats:`, {
-    answered: answeredQuestions.length,
-    correct: correctAnswers.length,
-    wrong: wrongAnswers.length,
-    corrections: corrections.length
-  });
   
   return (
     <div className={`min-h-screen bg-gray-100 p-2 md:p-4 ${isMobile ? 'pb-64' : ''}`}>
@@ -315,7 +273,7 @@ function App() {
               Sesi {testState.config.totalSessions - testState.currentSession + 1}
             </h2>
             <p className="text-sm md:text-base text-gray-600">
-              {isMobile ? 'Ketuk soal untuk memilih, gunakan keyboard di bawah' : 'Kerjakan dari atas ke bawah, kolom demi kolom'}
+              {isMobile ? 'Gunakan keyboard di bawah untuk mengisi jawaban' : 'Kerjakan dari atas ke bawah, kolom demi kolom'}
             </p>
             <p className="text-xs text-gray-500">
               {Math.floor(testState.config.sessionDuration / 60) > 0 && `${Math.floor(testState.config.sessionDuration / 60)}m `}
@@ -328,15 +286,7 @@ function App() {
             <MobileQuestionGrid
               questions={currentQuestions}
               answers={currentAnswers}
-              onAnswer={(questionId, answer) => {
-                const questionIndex = currentQuestions.findIndex(q => q.id === questionId);
-                handleAnswer(questionId, answer);
-                
-                // Handle auto-advance in the component itself
-                if (answer !== '' && questionIndex >= 0) {
-                  // The auto-advance logic is now in MobileQuestionGrid
-                }
-              }}
+              onAnswer={handleAnswer}
               currentQuestionIndex={currentQuestionIndex}
               onQuestionChange={handleQuestionChange}
               disabled={!testState.isActive || testState.isCompleted}
@@ -458,11 +408,7 @@ function App() {
         
         {/* Mobile Custom Keyboard */}
         {isMobile && testState.isActive && !testState.isCompleted && (
-          <MobileKeyboard
-            onNumberPress={handleMobileNumberPress}
-            onDelete={handleMobileDelete}
-            onNext={handleMobileNext}
-          />
+          <MobileKeyboard onNumberPress={handleMobileNumberPress} />
         )}
       </div>
     </div>

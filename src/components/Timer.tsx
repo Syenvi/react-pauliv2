@@ -11,8 +11,13 @@ export function Timer({ timeRemaining, currentSession, totalSessions }: TimerPro
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = timeRemaining % 60;
   
-  const sessionProgress = ((4 - currentSession) / 4) * 100;
-  const timeProgress = ((30 - (timeRemaining % 30)) / 30) * 100;
+  // Calculate progress based on current session
+  const sessionProgress = ((totalSessions - currentSession) / totalSessions) * 100;
+  
+  // Calculate time progress for current session (assuming each session has same duration)
+  // We need to get the session duration from somewhere - let's calculate it
+  const sessionDuration = 30; // This should ideally come from props or context
+  const timeProgress = ((sessionDuration - timeRemaining) / sessionDuration) * 100;
   
   return (
     <div className="bg-white rounded-lg shadow-lg p-4 mb-6">
@@ -24,13 +29,13 @@ export function Timer({ timeRemaining, currentSession, totalSessions }: TimerPro
           </span>
         </div>
         <div className="text-sm text-gray-600">
-          Session {5 - currentSession} of {totalSessions}
+          Sesi {totalSessions - currentSession + 1} dari {totalSessions}
         </div>
       </div>
       
       <div className="space-y-2">
         <div className="flex justify-between text-xs text-gray-500">
-          <span>Overall Progress</span>
+          <span>Progress Keseluruhan</span>
           <span>{Math.round(sessionProgress)}%</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -41,7 +46,7 @@ export function Timer({ timeRemaining, currentSession, totalSessions }: TimerPro
         </div>
         
         <div className="flex justify-between text-xs text-gray-500">
-          <span>Current Session</span>
+          <span>Sesi Saat Ini</span>
           <span>{Math.round(timeProgress)}%</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
