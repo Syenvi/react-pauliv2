@@ -210,7 +210,7 @@ function App() {
     }, 50);
   };
   
-  // Mobile keyboard handlers - Horizontal navigation (left to right)
+  // Mobile keyboard handlers - Improved horizontal navigation
   const handleMobileNumberPress = (number: string) => {
     if (currentQuestionIndex < allQuestions.length) {
       const question = allQuestions[currentQuestionIndex];
@@ -224,24 +224,25 @@ function App() {
       let nextQuestionIndex;
       
       // Move to next column (right), same row
-      if (currentColumn < 2) { // We have 3 columns (0, 1, 2)
+      if (currentColumn % 3 < 2) { // Within current 3-column set (0->1, 1->2)
         nextQuestionIndex = currentQuestionIndex + questionsPerColumn;
       } else {
-        // At rightmost column, move to leftmost column next row
+        // At rightmost column of current set, move to leftmost column next row
         if (currentRow < 24) { // Not at bottom row
-          nextQuestionIndex = (currentRow + 1); // Next row, first column (column 0)
+          const currentColumnSet = Math.floor(currentColumn / 3);
+          nextQuestionIndex = currentColumnSet * 3 * 25 + (currentRow + 1); // Next row, first column of current set
         } else {
-          // At bottom right, move to next set of 3 columns
+          // At bottom right of current set, move to next set
           const currentColumnSet = Math.floor(currentColumn / 3);
           nextQuestionIndex = (currentColumnSet + 1) * 3 * 25; // Next set, first column, first row
         }
       }
       
-      // Auto-advance to next question
+      // Auto-advance to next question with slight delay for better UX
       if (nextQuestionIndex < allQuestions.length) {
         setTimeout(() => {
           setCurrentQuestionIndex(nextQuestionIndex);
-        }, 100);
+        }, 150); // Slightly longer delay for smoother experience
       }
     }
   };
@@ -254,7 +255,9 @@ function App() {
   };
   
   const handleQuestionChange = (index: number) => {
-    setCurrentQuestionIndex(index);
+    // Ensure index is within bounds
+    const clampedIndex = Math.max(0, Math.min(index, allQuestions.length - 1));
+    setCurrentQuestionIndex(clampedIndex);
   };
   
   const handleRestart = () => {

@@ -19,50 +19,65 @@ export function MobileQuestionGrid({
   disabled 
 }: MobileQuestionGridProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const focusedElementRef = useRef<HTMLDivElement>(null);
   
   const questionsPerColumn = 25;
   const columnsToShow = 3; // Always show 3 columns
   
   // Calculate which questions to show based on current question index
   // Show current question and surrounding context
-  const startQuestionIndex = Math.max(0, currentQuestionIndex - 37); // Show some context before
+  const currentColumnSet = Math.floor(Math.floor(currentQuestionIndex / questionsPerColumn) / 3);
+  const startColumnIndex = currentColumnSet * 3;
+  const startQuestionIndex = startColumnIndex * questionsPerColumn;
   const endQuestionIndex = Math.min(questions.length, startQuestionIndex + 75); // Show 75 questions (3 columns × 25)
   
-  // Adjust if we're near the end
-  const actualStartIndex = Math.max(0, endQuestionIndex - 75);
-  const visibleQuestions = questions.slice(actualStartIndex, endQuestionIndex);
+  const visibleQuestions = questions.slice(startQuestionIndex, endQuestionIndex);
   
   // Adjust current question index for the visible set
-  const adjustedCurrentIndex = currentQuestionIndex - actualStartIndex;
+  const adjustedCurrentIndex = currentQuestionIndex - startQuestionIndex;
   
-  // Auto-scroll to focused question with better centering
+  // Improved auto-scroll with better centering and no over-scroll
   useEffect(() => {
     if (scrollContainerRef.current && adjustedCurrentIndex >= 0 && adjustedCurrentIndex < visibleQuestions.length) {
-      const focusedElement = scrollContainerRef.current.querySelector(`[data-question-index="${adjustedCurrentIndex}"]`);
-      if (focusedElement) {
-        // Calculate the position to center the element
-        const container = scrollContainerRef.current;
-        const elementRect = focusedElement.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
+      const focusedElement = scrollContainerRef.current.querySelector(`[data-question-index="${adjustedCurrentIndex}"]`) as HTMLElement;
+      
+      if (focusedElement && focusedElementRef.current !== focusedElement) {
+        focusedElementRef.current = focusedElement;
         
-        // Calculate scroll position to center the element
+        const container = scrollContainerRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = focusedElement.getBoundingClientRect();
+        
+        // Calculate relative position within the scrollable container
         const elementTop = focusedElement.offsetTop;
-        const elementHeight = elementRect.height;
+        const elementHeight = focusedElement.offsetHeight;
         const containerHeight = containerRect.height;
         
-        const scrollTop = elementTop - (containerHeight / 2) + (elementHeight / 2);
+        // Calculate ideal scroll position to center the element
+        const idealScrollTop = elementTop - (containerHeight / 2) + (elementHeight / 2);
         
-        container.scrollTo({
-          top: Math.max(0, scrollTop),
-          behavior: 'smooth'
-        });
+        // Get current scroll position
+        const currentScrollTop = container.scrollTop;
+        
+        // Only scroll if the element is not already reasonably centered
+        const tolerance = containerHeight * 0.3; // 30% tolerance
+        const elementCenter = elementTop - currentScrollTop + (elementHeight / 2);
+        const containerCenter = containerHeight / 2;
+        
+        if (Math.abs(elementCenter - containerCenter) > tolerance) {
+          // Smooth scroll to center the element
+          container.scrollTo({
+            top: Math.max(0, Math.min(idealScrollTop, container.scrollHeight - containerHeight)),
+            behavior: 'smooth'
+          });
+        }
       }
     }
   }, [adjustedCurrentIndex, visibleQuestions.length]);
   
   const handleQuestionClick = (localIndex: number) => {
     if (!disabled) {
-      const globalIndex = actualStartIndex + localIndex;
+      const globalIndex = startQuestionIndex + localIndex;
       onQuestionChange(globalIndex);
     }
   };
@@ -72,17 +87,56 @@ export function MobileQuestionGrid({
   
   return (
     <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+      {/* Column Set Navigation */}
+      {Math.ceil(questions.length / 75) > 1 && (
+        <div className="flex justify-center items-center gap-4 mb-4">
+          <button
+            onClick={() => {
+              if (currentColumnSet > 0) {
+                const newIndex = (currentColumnSet - 1) * 75;
+                onQuestionChange(newIndex);
+              }
+            }}
+            disabled={currentColumnSet === 0}
+            className="px-3 py-1 bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+          >
+            ← Prev
+          </button>
+          
+          <span className="text-sm font-medium text-gray-600">
+            Set {currentColumnSet + 1} dari {Math.ceil(questions.length / 75)}
+          </span>
+          
+          <button
+            onClick={() => {
+              if ((currentColumnSet + 1) * 75 < questions.length) {
+                const newIndex = (currentColumnSet + 1) * 75;
+                onQuestionChange(newIndex);
+              }
+            }}
+            disabled={(currentColumnSet + 1) * 75 >= questions.length}
+            className="px-3 py-1 bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+      
       {/* Questions Grid - Always 3 columns, scrollable content */}
-      <div className="overflow-y-auto max-h-96" ref={scrollContainerRef}>
+      <div 
+        className="overflow-y-auto max-h-80 scroll-smooth" 
+        ref={scrollContainerRef}
+        style={{ scrollBehavior: 'smooth' }}
+      >
         <div className="flex gap-2 justify-center">
           {Array.from({ length: actualColumns }, (_, colIndex) => {
             // Calculate the actual column number in the global context
-            const globalColumnIndex = Math.floor(actualStartIndex / questionsPerColumn) + colIndex;
+            const globalColumnIndex = startColumnIndex + colIndex;
             
             return (
               <div key={globalColumnIndex} className="flex flex-col gap-1">
                 {/* Column header with numbers */}
-                <div className="text-center text-sm text-gray-500 mb-1 h-6 font-semibold sticky top-0 bg-white z-10">
+                <div className="text-center text-sm text-gray-500 mb-1 h-6 font-semibold sticky top-0 bg-white z-10 border-b border-gray-200">
                   {globalColumnIndex + 1}
                 </div>
                 
@@ -92,12 +146,16 @@ export function MobileQuestionGrid({
                   if (localQuestionIndex >= visibleQuestions.length) return null;
                   
                   const question = visibleQuestions[localQuestionIndex];
-                  const globalQuestionIndex = actualStartIndex + localQuestionIndex;
+                  const globalQuestionIndex = startQuestionIndex + localQuestionIndex;
                   const existingAnswer = answers.find(a => a.questionId === question.id);
                   const isFocused = globalQuestionIndex === currentQuestionIndex;
                   
                   return (
-                    <div key={question.id} className="relative" data-question-index={localQuestionIndex}>
+                    <div 
+                      key={question.id} 
+                      className="relative" 
+                      data-question-index={localQuestionIndex}
+                    >
                       {/* Row number on the left for first column */}
                       {colIndex === 0 && (
                         <div className="absolute -left-8 top-0 h-full flex items-center">
@@ -110,7 +168,7 @@ export function MobileQuestionGrid({
                       <div 
                         className={`border-2 flex cursor-pointer transition-all duration-200 ${
                           isFocused 
-                            ? 'border-blue-500 bg-blue-50 shadow-lg' 
+                            ? 'border-blue-500 bg-blue-50 shadow-lg scale-105' 
                             : 'border-gray-300 bg-white hover:border-gray-400'
                         }`}
                         onClick={() => handleQuestionClick(localQuestionIndex)}
@@ -127,7 +185,7 @@ export function MobileQuestionGrid({
                         
                         {/* Answer display */}
                         <div className="w-12 h-20 relative flex items-center justify-center">
-                          <div className="text-xl font-mono font-bold text-gray-700">
+                          <div className={`text-xl font-mono font-bold ${isFocused ? 'text-blue-700' : 'text-gray-700'}`}>
                             {existingAnswer?.answer || ''}
                           </div>
                           
@@ -138,7 +196,9 @@ export function MobileQuestionGrid({
                           
                           {/* Focus indicator */}
                           {isFocused && (
-                            <div className="absolute inset-0 border-2 border-blue-400 rounded-sm animate-pulse" />
+                            <div className="absolute inset-0 border-2 border-blue-400 rounded-sm">
+                              <div className="absolute inset-1 bg-blue-100 opacity-30 rounded-sm animate-pulse" />
+                            </div>
                           )}
                         </div>
                       </div>
