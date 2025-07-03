@@ -20,3 +20,9 @@ export function generateQuestion(): Question {
 export function generateQuestions(count: number = 200): Question[] {
   return Array.from({ length: count }, () => generateQuestion());
 }
+
+// Generate questions on demand - unlimited
+export function generateMoreQuestions(existingQuestions: Question[], additionalCount: number = 300): Question[] {
+  const newQuestions = Array.from({ length: additionalCount }, () => generateQuestion());
+  return [...existingQuestions, ...newQuestions];
+}

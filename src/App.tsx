@@ -6,7 +6,7 @@ import { SessionResults } from './components/SessionResults';
 import { MobileKeyboard } from './components/MobileKeyboard';
 import { MobileQuestionGrid } from './components/MobileQuestionGrid';
 import { useTimer } from './hooks/useTimer';
-import { generateQuestions } from './utils/questionGenerator';
+import { generateQuestions, generateMoreQuestions } from './utils/questionGenerator';
 import { TestState, SessionData, Answer, TestConfig } from './types/test';
 import { RotateCcw } from 'lucide-react';
 
@@ -23,7 +23,8 @@ function App() {
     }
   });
   
-  const [currentQuestions, setCurrentQuestions] = useState(generateQuestions(400));
+  // Start with initial questions and generate more as needed
+  const [currentQuestions, setCurrentQuestions] = useState(generateQuestions(1000));
   const [currentAnswers, setCurrentAnswers] = useState<Answer[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -40,6 +41,17 @@ function App() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+  
+  // Auto-generate more questions when approaching the end
+  useEffect(() => {
+    const questionsNeeded = isMobile ? 
+      Math.ceil((currentQuestionIndex + 1) / 75) * 75 : // Mobile: ensure we have enough for current 3-column set
+      Math.ceil((currentQuestionIndex + 1) / 300) * 300; // Desktop: ensure we have enough for current 12-column set
+    
+    if (currentQuestions.length < questionsNeeded + 300) {
+      setCurrentQuestions(prev => generateMoreQuestions(prev, 500));
+    }
+  }, [currentQuestionIndex, isMobile, currentQuestions.length]);
   
   // Auto-scroll to top when session changes
   useEffect(() => {
@@ -67,7 +79,7 @@ function App() {
     const corrections = currentAnswers.filter(a => a.wasChanged);
     const wrongAnswers = answeredQuestions.filter(a => !a.isCorrect && !a.wasChanged);
     
-    // Save current session data
+    // Save current session data with all questions that were generated
     const sessionData: SessionData = {
       sessionNumber: testState.config.totalSessions - testState.currentSession + 1,
       questions: currentQuestions,
@@ -89,7 +101,8 @@ function App() {
     
     // Reset for next session
     if (testState.currentSession > 1) {
-      setCurrentQuestions(generateQuestions(400));
+      // Generate fresh questions for next session
+      setCurrentQuestions(generateQuestions(1000));
       setCurrentAnswers([]);
       setCurrentQuestionIndex(0);
       timer.reset(testState.config.sessionDuration);
@@ -113,6 +126,9 @@ function App() {
     });
     setPreviousSession(config.totalSessions);
     setCurrentQuestionIndex(0);
+    // Generate fresh questions for the test
+    setCurrentQuestions(generateQuestions(1000));
+    setCurrentAnswers([]);
     timer.reset(config.sessionDuration);
     
     // Focus on first input after a short delay (desktop only)
@@ -165,7 +181,7 @@ function App() {
   
   const handleEnterPressed = (currentIndex: number) => {
     const questionsPerColumn = 25;
-    const totalColumns = 12;
+    const totalColumns = isMobile ? 3 : 12;
     const currentColumn = Math.floor(currentIndex / questionsPerColumn);
     const currentRow = currentIndex % questionsPerColumn;
     
@@ -179,8 +195,8 @@ function App() {
       if (currentColumn < totalColumns - 1) {
         nextIndex = (currentColumn + 1) * questionsPerColumn;
       } else {
-        // If at last column, stay at current position
-        nextIndex = currentIndex;
+        // If at last column of current set, go to first column of next set
+        nextIndex = (currentColumn + 1) * questionsPerColumn;
       }
     }
     
@@ -198,9 +214,11 @@ function App() {
     }, 50);
   };
   
-  // Mobile keyboard handlers - Left to right navigation for 3 columns
+  // Mobile keyboard handlers - Left to right navigation
   const handleMobileNumberPress = (number: string) => {
-    if (currentQuestionIndex < 75) { // Only 3 columns × 25 rows = 75 questions for mobile
+    const maxQuestions = Math.min(currentQuestions.length, getCurrentViewMaxQuestions());
+    
+    if (currentQuestionIndex < maxQuestions) {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
       
@@ -218,13 +236,13 @@ function App() {
         if (currentRow < 24) {
           nextQuestionIndex = (currentRow + 1); // Next row, first column
         } else {
-          // At bottom right, stay at current position
-          nextQuestionIndex = currentQuestionIndex;
+          // At bottom right of current 3-column set, move to next 3-column set
+          nextQuestionIndex = 75; // Next set starts at index 75
         }
       }
       
-      // Ensure we don't go beyond available questions for mobile (75 questions)
-      if (nextQuestionIndex < 75) {
+      // Auto-advance to next question
+      if (nextQuestionIndex < maxQuestions) {
         setTimeout(() => {
           setCurrentQuestionIndex(nextQuestionIndex);
         }, 100);
@@ -233,7 +251,9 @@ function App() {
   };
   
   const handleMobileDelete = () => {
-    if (currentQuestionIndex < 75) { // Only for mobile's 75 questions
+    const maxQuestions = Math.min(currentQuestions.length, getCurrentViewMaxQuestions());
+    
+    if (currentQuestionIndex < maxQuestions) {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, '');
     }
@@ -241,6 +261,36 @@ function App() {
   
   const handleQuestionChange = (index: number) => {
     setCurrentQuestionIndex(index);
+  };
+  
+  const getCurrentViewMaxQuestions = () => {
+    return isMobile ? 
+      Math.ceil((currentQuestionIndex + 1) / 75) * 75 : // Mobile: current 3-column set
+      Math.ceil((currentQuestionIndex + 1) / 300) * 300; // Desktop: current 12-column set
+  };
+  
+  const getVisibleQuestions = () => {
+    if (isMobile) {
+      // Mobile: show current 3-column set (75 questions)
+      const currentSet = Math.floor(currentQuestionIndex / 75);
+      const startIndex = currentSet * 75;
+      const endIndex = Math.min(startIndex + 75, currentQuestions.length);
+      return {
+        questions: currentQuestions.slice(startIndex, endIndex),
+        startIndex,
+        adjustedCurrentIndex: currentQuestionIndex - startIndex
+      };
+    } else {
+      // Desktop: show current 12-column set (300 questions)
+      const currentSet = Math.floor(currentQuestionIndex / 300);
+      const startIndex = currentSet * 300;
+      const endIndex = Math.min(startIndex + 300, currentQuestions.length);
+      return {
+        questions: currentQuestions.slice(startIndex, endIndex),
+        startIndex,
+        adjustedCurrentIndex: currentQuestionIndex - startIndex
+      };
+    }
   };
   
   const handleRestart = () => {
@@ -255,7 +305,7 @@ function App() {
         totalSessions: 4
       }
     });
-    setCurrentQuestions(generateQuestions(400));
+    setCurrentQuestions(generateQuestions(1000));
     setCurrentAnswers([]);
     setCurrentQuestionIndex(0);
     setPreviousSession(0);
@@ -291,6 +341,8 @@ function App() {
   const corrections = currentAnswers.filter(a => a.wasChanged);
   const wrongAnswers = answeredQuestions.filter(a => !a.isCorrect && !a.wasChanged);
   
+  const visibleData = getVisibleQuestions();
+  
   return (
     <div className={`min-h-screen bg-gray-100 p-2 md:p-4 ${isMobile ? 'pb-64' : ''}`}>
       <div className="max-w-7xl mx-auto">
@@ -313,16 +365,19 @@ function App() {
               {Math.floor(testState.config.sessionDuration / 60) > 0 && `${Math.floor(testState.config.sessionDuration / 60)}m `}
               {testState.config.sessionDuration % 60}s per sesi • {testState.config.totalSessions} sesi total
             </p>
+            <p className="text-xs text-blue-600 mt-1">
+              Soal unlimited - kerjakan sebanyak mungkin dalam waktu yang tersedia
+            </p>
           </div>
           
           {/* Mobile Layout */}
           {isMobile ? (
             <MobileQuestionGrid
-              questions={currentQuestions.slice(0, 75)} // Only show first 75 questions (3 columns × 25 rows)
+              questions={visibleData.questions}
               answers={currentAnswers}
               onAnswer={handleAnswer}
-              currentQuestionIndex={currentQuestionIndex}
-              onQuestionChange={handleQuestionChange}
+              currentQuestionIndex={visibleData.adjustedCurrentIndex}
+              onQuestionChange={(index) => handleQuestionChange(index + visibleData.startIndex)}
               disabled={!testState.isActive || testState.isCompleted}
             />
           ) : (
@@ -338,9 +393,11 @@ function App() {
                     
                     {Array.from({ length: 25 }, (_, rowIndex) => {
                       const questionIndex = colIndex * 25 + rowIndex;
-                      if (questionIndex >= currentQuestions.length) return null;
+                      const globalQuestionIndex = questionIndex + visibleData.startIndex;
                       
-                      const question = currentQuestions[questionIndex];
+                      if (questionIndex >= visibleData.questions.length) return null;
+                      
+                      const question = visibleData.questions[questionIndex];
                       const existingAnswer = currentAnswers.find(a => a.questionId === question.id);
                       
                       return (
@@ -379,18 +436,18 @@ function App() {
                                   
                                   // Auto-focus to next input after entering a value
                                   if (value !== '') {
-                                    handleEnterPressed(questionIndex);
+                                    handleEnterPressed(globalQuestionIndex);
                                   }
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter' || e.key === 'ArrowDown') {
                                     e.preventDefault();
-                                    handleEnterPressed(questionIndex);
+                                    handleEnterPressed(globalQuestionIndex);
                                   }
                                 }}
                                 disabled={!testState.isActive || testState.isCompleted}
                                 maxLength={1}
-                                data-index={questionIndex}
+                                data-index={globalQuestionIndex}
                                 className="w-full h-full text-center font-mono text-xs md:text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400 focus:bg-blue-50"
                                 placeholder=""
                               />
