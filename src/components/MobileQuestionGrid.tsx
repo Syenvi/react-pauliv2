@@ -21,12 +21,27 @@ export function MobileQuestionGrid({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   const questionsPerColumn = 25;
-  const totalColumns = 3; // Only show 3 columns for mobile
+  const columnsPerView = 3; // Show 3 columns at a time
+  
+  // Calculate which set of 3 columns to show based on current question
+  const currentColumnSet = Math.floor(Math.floor(currentQuestionIndex / 25) / 3);
+  const startColumn = currentColumnSet * 3;
+  const endColumn = Math.min(startColumn + 3, Math.ceil(questions.length / 25));
+  const actualColumns = endColumn - startColumn;
+  
+  // Get questions for current view (3 columns)
+  const visibleQuestions = questions.slice(
+    startColumn * 25, 
+    endColumn * 25
+  );
+  
+  // Adjust current question index for the visible set
+  const adjustedCurrentIndex = currentQuestionIndex - (startColumn * 25);
   
   // Auto-scroll to focused question
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      const focusedElement = scrollContainerRef.current.querySelector(`[data-question-index="${currentQuestionIndex}"]`);
+    if (scrollContainerRef.current && adjustedCurrentIndex >= 0) {
+      const focusedElement = scrollContainerRef.current.querySelector(`[data-question-index="${adjustedCurrentIndex}"]`);
       if (focusedElement) {
         focusedElement.scrollIntoView({ 
           behavior: 'smooth', 
@@ -35,36 +50,74 @@ export function MobileQuestionGrid({
         });
       }
     }
-  }, [currentQuestionIndex]);
+  }, [adjustedCurrentIndex]);
   
-  const handleQuestionClick = (questionIndex: number) => {
+  const handleQuestionClick = (localIndex: number) => {
     if (!disabled) {
-      onQuestionChange(questionIndex);
+      const globalIndex = startColumn * 25 + localIndex;
+      onQuestionChange(globalIndex);
     }
   };
   
   return (
     <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-      {/* Questions Grid - 3 columns for mobile */}
+      {/* Column Set Navigation */}
+      {Math.ceil(questions.length / 75) > 1 && (
+        <div className="flex justify-center items-center gap-4 mb-4">
+          <button
+            onClick={() => {
+              if (currentColumnSet > 0) {
+                const newIndex = (currentColumnSet - 1) * 75;
+                onQuestionChange(newIndex);
+              }
+            }}
+            disabled={currentColumnSet === 0}
+            className="px-3 py-1 bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            ← Prev
+          </button>
+          
+          <span className="text-sm font-medium text-gray-600">
+            Kolom {startColumn + 1}-{endColumn} dari {Math.ceil(questions.length / 25)}
+          </span>
+          
+          <button
+            onClick={() => {
+              if ((currentColumnSet + 1) * 75 < questions.length) {
+                const newIndex = (currentColumnSet + 1) * 75;
+                onQuestionChange(newIndex);
+              }
+            }}
+            disabled={(currentColumnSet + 1) * 75 >= questions.length}
+            className="px-3 py-1 bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+      
+      {/* Questions Grid - Current 3 columns */}
       <div className="overflow-x-auto overflow-y-visible" ref={scrollContainerRef}>
         <div className="flex gap-2 justify-center" style={{ minWidth: 'fit-content' }}>
-          {Array.from({ length: totalColumns }, (_, colIndex) => (
-            <div key={colIndex} className="flex flex-col gap-1">
+          {Array.from({ length: actualColumns }, (_, colIndex) => (
+            <div key={startColumn + colIndex} className="flex flex-col gap-1">
               {/* Column header with numbers */}
               <div className="text-center text-sm text-gray-500 mb-1 h-6 font-semibold">
-                {colIndex + 1}
+                {startColumn + colIndex + 1}
               </div>
               
               {Array.from({ length: questionsPerColumn }, (_, rowIndex) => {
-                const questionIndex = colIndex * questionsPerColumn + rowIndex;
-                if (questionIndex >= questions.length) return null;
+                const localQuestionIndex = colIndex * questionsPerColumn + rowIndex;
+                const globalQuestionIndex = startColumn * 25 + localQuestionIndex;
                 
-                const question = questions[questionIndex];
+                if (localQuestionIndex >= visibleQuestions.length) return null;
+                
+                const question = visibleQuestions[localQuestionIndex];
                 const existingAnswer = answers.find(a => a.questionId === question.id);
-                const isFocused = questionIndex === currentQuestionIndex;
+                const isFocused = globalQuestionIndex === currentQuestionIndex;
                 
                 return (
-                  <div key={question.id} className="relative" data-question-index={questionIndex}>
+                  <div key={question.id} className="relative" data-question-index={localQuestionIndex}>
                     {/* Row number on the left for first column */}
                     {colIndex === 0 && (
                       <div className="absolute -left-8 top-0 h-full flex items-center">
@@ -80,7 +133,7 @@ export function MobileQuestionGrid({
                           ? 'border-blue-500 bg-blue-50 shadow-lg' 
                           : 'border-gray-300 bg-white hover:border-gray-400'
                       }`}
-                      onClick={() => handleQuestionClick(questionIndex)}
+                      onClick={() => handleQuestionClick(localQuestionIndex)}
                     >
                       {/* Question numbers stacked vertically */}
                       <div className="w-12 h-20 flex flex-col border-r border-gray-300">
@@ -117,21 +170,24 @@ export function MobileQuestionGrid({
         </div>
       </div>
       
-      {/* Progress Indicator */}
+      {/* Progress Indicator - Global progress */}
       <div className="mt-4 bg-gray-200 rounded-full h-2">
         <div 
           className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-          style={{ width: `${((currentQuestionIndex + 1) / (totalColumns * questionsPerColumn)) * 100}%` }}
+          style={{ width: `${Math.min(((currentQuestionIndex + 1) / Math.min(questions.length, 300)) * 100, 100)}%` }}
         />
       </div>
       <div className="text-center text-xs text-gray-500 mt-1">
-        Soal {currentQuestionIndex + 1} dari {totalColumns * questionsPerColumn}
+        Soal {currentQuestionIndex + 1} • Unlimited questions available
       </div>
       
       {/* Navigation Instructions */}
       <div className="mt-3 text-center text-xs text-gray-600 bg-blue-50 rounded-lg p-2">
         <div className="font-semibold mb-1">Pola Pengisian:</div>
         <div>Kiri → Tengah → Kanan → Kiri (baris berikutnya)</div>
+        <div className="text-xs text-gray-500 mt-1">
+          Kerjakan sebanyak mungkin dalam waktu yang tersedia
+        </div>
       </div>
     </div>
   );

@@ -23,7 +23,8 @@ function App() {
     }
   });
   
-  const [currentQuestions, setCurrentQuestions] = useState(generateQuestions(400));
+  // Generate unlimited questions (2000 questions should be more than enough)
+  const [currentQuestions, setCurrentQuestions] = useState(generateQuestions(2000));
   const [currentAnswers, setCurrentAnswers] = useState<Answer[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -67,10 +68,17 @@ function App() {
     const corrections = currentAnswers.filter(a => a.wasChanged);
     const wrongAnswers = answeredQuestions.filter(a => !a.isCorrect && !a.wasChanged);
     
-    // Save current session data
+    // Save current session data with only the questions that were actually shown/attempted
+    const maxQuestionIndex = Math.max(...currentAnswers.map(a => {
+      const qIndex = currentQuestions.findIndex(q => q.id === a.questionId);
+      return qIndex;
+    }), currentQuestionIndex);
+    
+    const sessionQuestions = currentQuestions.slice(0, maxQuestionIndex + 1);
+    
     const sessionData: SessionData = {
       sessionNumber: testState.config.totalSessions - testState.currentSession + 1,
-      questions: currentQuestions,
+      questions: sessionQuestions,
       answers: currentAnswers,
       startTime: Date.now() - (testState.config.sessionDuration * 1000),
       endTime: Date.now(),
@@ -89,12 +97,13 @@ function App() {
     
     // Reset for next session
     if (testState.currentSession > 1) {
-      setCurrentQuestions(generateQuestions(400));
+      // Generate new questions for next session
+      setCurrentQuestions(generateQuestions(2000));
       setCurrentAnswers([]);
       setCurrentQuestionIndex(0);
       timer.reset(testState.config.sessionDuration);
     }
-  }, [testState.currentSession, testState.config, currentQuestions, currentAnswers]);
+  }, [testState.currentSession, testState.config, currentQuestions, currentAnswers, currentQuestionIndex]);
   
   const timer = useTimer(
     testState.config.sessionDuration, 
@@ -113,6 +122,9 @@ function App() {
     });
     setPreviousSession(config.totalSessions);
     setCurrentQuestionIndex(0);
+    // Generate fresh questions for the test
+    setCurrentQuestions(generateQuestions(2000));
+    setCurrentAnswers([]);
     timer.reset(config.sessionDuration);
     
     // Focus on first input after a short delay (desktop only)
@@ -165,7 +177,7 @@ function App() {
   
   const handleEnterPressed = (currentIndex: number) => {
     const questionsPerColumn = 25;
-    const totalColumns = 12;
+    const totalColumns = isMobile ? 3 : 12;
     const currentColumn = Math.floor(currentIndex / questionsPerColumn);
     const currentRow = currentIndex % questionsPerColumn;
     
@@ -179,8 +191,8 @@ function App() {
       if (currentColumn < totalColumns - 1) {
         nextIndex = (currentColumn + 1) * questionsPerColumn;
       } else {
-        // If at last column, stay at current position
-        nextIndex = currentIndex;
+        // If at last visible column, continue to next set of columns
+        nextIndex = currentIndex + 1;
       }
     }
     
@@ -198,9 +210,9 @@ function App() {
     }, 50);
   };
   
-  // Mobile keyboard handlers - Left to right navigation for 3 columns
+  // Mobile keyboard handlers - Dynamic navigation
   const handleMobileNumberPress = (number: string) => {
-    if (currentQuestionIndex < 75) { // Only 3 columns × 25 rows = 75 questions for mobile
+    if (currentQuestionIndex < currentQuestions.length) {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
       
@@ -218,13 +230,14 @@ function App() {
         if (currentRow < 24) {
           nextQuestionIndex = (currentRow + 1); // Next row, first column
         } else {
-          // At bottom right, stay at current position
-          nextQuestionIndex = currentQuestionIndex;
+          // At bottom right of current 3-column set, move to next 3-column set
+          const currentColumnSet = Math.floor(currentColumn / 3);
+          nextQuestionIndex = (currentColumnSet + 1) * 3 * 25; // Next set, first column, first row
         }
       }
       
-      // Ensure we don't go beyond available questions for mobile (75 questions)
-      if (nextQuestionIndex < 75) {
+      // Auto-advance to next question
+      if (nextQuestionIndex < currentQuestions.length) {
         setTimeout(() => {
           setCurrentQuestionIndex(nextQuestionIndex);
         }, 100);
@@ -233,7 +246,7 @@ function App() {
   };
   
   const handleMobileDelete = () => {
-    if (currentQuestionIndex < 75) { // Only for mobile's 75 questions
+    if (currentQuestionIndex < currentQuestions.length) {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, '');
     }
@@ -255,7 +268,7 @@ function App() {
         totalSessions: 4
       }
     });
-    setCurrentQuestions(generateQuestions(400));
+    setCurrentQuestions(generateQuestions(2000));
     setCurrentAnswers([]);
     setCurrentQuestionIndex(0);
     setPreviousSession(0);
@@ -291,6 +304,11 @@ function App() {
   const corrections = currentAnswers.filter(a => a.wasChanged);
   const wrongAnswers = answeredQuestions.filter(a => !a.isCorrect && !a.wasChanged);
   
+  // Calculate how many questions are visible/available for current view
+  const visibleQuestions = isMobile ? 
+    Math.min(75, currentQuestions.length) : // Mobile: 3 columns × 25 = 75 questions per view
+    Math.min(300, currentQuestions.length); // Desktop: 12 columns × 25 = 300 questions per view
+  
   return (
     <div className={`min-h-screen bg-gray-100 p-2 md:p-4 ${isMobile ? 'pb-64' : ''}`}>
       <div className="max-w-7xl mx-auto">
@@ -313,12 +331,15 @@ function App() {
               {Math.floor(testState.config.sessionDuration / 60) > 0 && `${Math.floor(testState.config.sessionDuration / 60)}m `}
               {testState.config.sessionDuration % 60}s per sesi • {testState.config.totalSessions} sesi total
             </p>
+            <p className="text-xs text-blue-600 mt-1">
+              Soal unlimited - kerjakan sebanyak mungkin dalam waktu yang tersedia
+            </p>
           </div>
           
           {/* Mobile Layout */}
           {isMobile ? (
             <MobileQuestionGrid
-              questions={currentQuestions.slice(0, 75)} // Only show first 75 questions (3 columns × 25 rows)
+              questions={currentQuestions}
               answers={currentAnswers}
               onAnswer={handleAnswer}
               currentQuestionIndex={currentQuestionIndex}
