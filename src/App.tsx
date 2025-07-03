@@ -198,38 +198,14 @@ function App() {
     }, 50);
   };
   
-  // Mobile keyboard handlers
+  // Mobile keyboard handlers - Fixed navigation logic
   const handleMobileNumberPress = (number: string) => {
     if (currentQuestionIndex < currentQuestions.length) {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
       
-      // Auto-advance to next question
-      const currentColumn = Math.floor(currentQuestionIndex / 25);
-      const currentRow = currentQuestionIndex % 25;
-      const columnInPair = currentColumn % 2; // 0 for left, 1 for right
-      
-      let nextQuestionIndex;
-      
-      if (columnInPair === 0) {
-        // Currently on left column, move to right column same row
-        nextQuestionIndex = currentQuestionIndex + 25;
-      } else {
-        // Currently on right column, move to left column next row
-        if (currentRow < 24) {
-          // Move to next row, left column
-          nextQuestionIndex = currentQuestionIndex - 25 + 1;
-        } else {
-          // At bottom of right column, move to next column pair, top left
-          const currentColumnPair = Math.floor(currentColumn / 2);
-          if (currentColumnPair < 5) { // 12 columns = 6 pairs
-            nextQuestionIndex = (currentColumnPair + 1) * 2 * 25;
-          } else {
-            // Stay at current position if at the end
-            nextQuestionIndex = currentQuestionIndex;
-          }
-        }
-      }
+      // Simple sequential navigation for mobile
+      const nextQuestionIndex = currentQuestionIndex + 1;
       
       // Ensure we don't go beyond available questions
       if (nextQuestionIndex < currentQuestions.length) {
