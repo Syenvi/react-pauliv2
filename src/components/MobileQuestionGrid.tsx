@@ -20,7 +20,7 @@ export function MobileQuestionGrid({
 }: MobileQuestionGridProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  const questionsPerColumn = 25;
+  const questionsPerColumn = 50;
   const totalColumns = 3; // Only show 3 columns for mobile
   
   // Auto-scroll to focused question
