@@ -155,11 +155,11 @@ export function MobileQuestionGrid({
       <div className="mt-4 bg-gray-200 rounded-full h-2">
         <div 
           className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-          style={{ width: `${Math.min(((currentQuestionIndex + 1) / Math.min(questions.length, 1000)) * 100, 100)}%` }}
+          style={{ width: `${Math.min(((currentQuestionIndex + 1) / questions.length) * 100, 100)}%` }}
         />
       </div>
       <div className="text-center text-xs text-gray-500 mt-1">
-        Soal {currentQuestionIndex + 1} • Unlimited questions available
+        Soal {currentQuestionIndex + 1} dari {questions.length} • 4000 soal tersedia
       </div>
       
       {/* Navigation Instructions */}

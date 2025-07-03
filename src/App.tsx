@@ -6,7 +6,7 @@ import { SessionResults } from './components/SessionResults';
 import { MobileKeyboard } from './components/MobileKeyboard';
 import { MobileQuestionGrid } from './components/MobileQuestionGrid';
 import { useTimer } from './hooks/useTimer';
-import { generateQuestions } from './utils/questionGenerator';
+import { getAllQuestions, getTotalQuestionsCount } from './utils/questionGenerator';
 import { TestState, SessionData, Answer, TestConfig } from './types/test';
 import { RotateCcw } from 'lucide-react';
 
@@ -23,8 +23,8 @@ function App() {
     }
   });
   
-  // Start with initial questions and auto-expand as needed
-  const [currentQuestions, setCurrentQuestions] = useState(generateQuestions(500));
+  // Use pre-generated 4000 questions
+  const [allQuestions] = useState(() => getAllQuestions());
   const [currentAnswers, setCurrentAnswers] = useState<Answer[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -41,23 +41,6 @@ function App() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
-  // Auto-generate more questions when getting close to the end
-  useEffect(() => {
-    const maxQuestionIndex = Math.max(
-      currentQuestionIndex,
-      ...currentAnswers.map(a => {
-        const qIndex = currentQuestions.findIndex(q => q.id === a.questionId);
-        return qIndex >= 0 ? qIndex : 0;
-      })
-    );
-    
-    // If we're within 100 questions of the end, generate 500 more
-    if (maxQuestionIndex >= currentQuestions.length - 100) {
-      console.log('Auto-generating more questions...');
-      setCurrentQuestions(prev => [...prev, ...generateQuestions(500)]);
-    }
-  }, [currentQuestionIndex, currentAnswers, currentQuestions.length]);
   
   // Auto-scroll to top when session changes
   useEffect(() => {
@@ -89,11 +72,11 @@ function App() {
     
     // Save current session data with only the questions that were actually shown/attempted
     const maxQuestionIndex = Math.max(...currentAnswers.map(a => {
-      const qIndex = currentQuestions.findIndex(q => q.id === a.questionId);
+      const qIndex = allQuestions.findIndex(q => q.id === a.questionId);
       return qIndex;
     }), currentQuestionIndex);
     
-    const sessionQuestions = currentQuestions.slice(0, maxQuestionIndex + 1);
+    const sessionQuestions = allQuestions.slice(0, maxQuestionIndex + 1);
     
     const sessionData: SessionData = {
       sessionNumber: testState.config.totalSessions - testState.currentSession + 1,
@@ -116,12 +99,10 @@ function App() {
     
     // Reset for next session
     if (testState.currentSession > 1) {
-      // Generate new questions for next session
-      setCurrentQuestions(generateQuestions(500));
       setCurrentAnswers([]);
       setCurrentQuestionIndex(0);
     }
-  }, [testState.currentSession, testState.config, currentQuestions, currentAnswers, currentQuestionIndex]);
+  }, [testState.currentSession, testState.config, allQuestions, currentAnswers, currentQuestionIndex]);
   
   const timer = useTimer(
     testState.config.sessionDuration, 
@@ -129,18 +110,10 @@ function App() {
     testState.isActive && !testState.isCompleted
   );
   
-  // Update timer in test state for consistency
-  useEffect(() => {
-    if (testState.isActive && !testState.isCompleted) {
-      setTestState(prev => ({
-        ...prev,
-        timeRemaining: timer.timeRemaining
-      }));
-    }
-  }, [timer.timeRemaining, testState.isActive, testState.isCompleted]);
-  
   const handleStart = (config: TestConfig) => {
     console.log('Starting test with config:', config);
+    console.log(`Total questions available: ${getTotalQuestionsCount()}`);
+    
     setTestState({
       isActive: true,
       currentSession: config.totalSessions,
@@ -151,8 +124,6 @@ function App() {
     });
     setPreviousSession(config.totalSessions);
     setCurrentQuestionIndex(0);
-    // Generate fresh questions for the test
-    setCurrentQuestions(generateQuestions(500));
     setCurrentAnswers([]);
     timer.reset(config.sessionDuration);
     
@@ -168,7 +139,7 @@ function App() {
   };
   
   const handleAnswer = (questionId: string, answer: string) => {
-    const question = currentQuestions.find(q => q.id === questionId);
+    const question = allQuestions.find(q => q.id === questionId);
     if (!question) return;
     
     const isCorrect = answer !== '' && parseInt(answer) === question.correctAnswer;
@@ -241,8 +212,8 @@ function App() {
   
   // Mobile keyboard handlers - Horizontal navigation (left to right)
   const handleMobileNumberPress = (number: string) => {
-    if (currentQuestionIndex < currentQuestions.length) {
-      const question = currentQuestions[currentQuestionIndex];
+    if (currentQuestionIndex < allQuestions.length) {
+      const question = allQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
       
       // Mobile navigation: left to right, then next row
@@ -267,7 +238,7 @@ function App() {
       }
       
       // Auto-advance to next question
-      if (nextQuestionIndex < currentQuestions.length) {
+      if (nextQuestionIndex < allQuestions.length) {
         setTimeout(() => {
           setCurrentQuestionIndex(nextQuestionIndex);
         }, 100);
@@ -276,8 +247,8 @@ function App() {
   };
   
   const handleMobileDelete = () => {
-    if (currentQuestionIndex < currentQuestions.length) {
-      const question = currentQuestions[currentQuestionIndex];
+    if (currentQuestionIndex < allQuestions.length) {
+      const question = allQuestions[currentQuestionIndex];
       handleAnswer(question.id, '');
     }
   };
@@ -298,7 +269,6 @@ function App() {
         totalSessions: 4
       }
     });
-    setCurrentQuestions(generateQuestions(500));
     setCurrentAnswers([]);
     setCurrentQuestionIndex(0);
     setPreviousSession(0);
@@ -357,14 +327,14 @@ function App() {
               {testState.config.sessionDuration % 60}s per sesi • {testState.config.totalSessions} sesi total
             </p>
             <p className="text-xs text-blue-600 mt-1">
-              Soal unlimited - kerjakan sebanyak mungkin dalam waktu yang tersedia
+              4000 soal tersedia - kerjakan sebanyak mungkin dalam waktu yang tersedia
             </p>
           </div>
           
           {/* Mobile Layout */}
           {isMobile ? (
             <MobileQuestionGrid
-              questions={currentQuestions}
+              questions={allQuestions}
               answers={currentAnswers}
               onAnswer={handleAnswer}
               currentQuestionIndex={currentQuestionIndex}
@@ -372,15 +342,15 @@ function App() {
               disabled={!testState.isActive || testState.isCompleted}
             />
           ) : (
-            /* Desktop Layout - Traditional Pauli Test Grid with Auto-Expand */
+            /* Desktop Layout - Traditional Pauli Test Grid */
             <div className="overflow-x-auto">
               <div className="flex gap-1 md:gap-2 justify-center" style={{ minWidth: 'fit-content' }}>
-                {/* Calculate how many columns we need based on current progress */}
+                {/* Show columns based on current progress, minimum 12 columns */}
                 {(() => {
                   const maxQuestionIndex = Math.max(
                     currentQuestionIndex,
                     ...currentAnswers.map(a => {
-                      const qIndex = currentQuestions.findIndex(q => q.id === a.questionId);
+                      const qIndex = allQuestions.findIndex(q => q.id === a.questionId);
                       return qIndex >= 0 ? qIndex : 0;
                     })
                   );
@@ -389,8 +359,10 @@ function App() {
                   const minColumns = 12;
                   const neededColumns = Math.ceil((maxQuestionIndex + 1) / 25);
                   const totalColumns = Math.max(minColumns, neededColumns + 2); // +2 for buffer
+                  const maxColumns = Math.ceil(allQuestions.length / 25); // Don't exceed total available
+                  const displayColumns = Math.min(totalColumns, maxColumns);
                   
-                  return Array.from({ length: totalColumns }, (_, colIndex) => (
+                  return Array.from({ length: displayColumns }, (_, colIndex) => (
                     <div key={colIndex} className="flex flex-col gap-1">
                       {/* Column header with numbers */}
                       <div className="text-center text-xs text-gray-500 mb-1 h-4">
@@ -399,9 +371,9 @@ function App() {
                       
                       {Array.from({ length: 25 }, (_, rowIndex) => {
                         const questionIndex = colIndex * 25 + rowIndex;
-                        if (questionIndex >= currentQuestions.length) return null;
+                        if (questionIndex >= allQuestions.length) return null;
                         
-                        const question = currentQuestions[questionIndex];
+                        const question = allQuestions[questionIndex];
                         const existingAnswer = currentAnswers.find(a => a.questionId === question.id);
                         
                         return (
