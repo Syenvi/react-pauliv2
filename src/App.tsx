@@ -23,8 +23,8 @@ function App() {
     }
   });
   
-  // Generate unlimited questions (2000 questions should be more than enough)
-  const [currentQuestions, setCurrentQuestions] = useState(generateQuestions(2000));
+  // Start with initial questions and auto-expand as needed
+  const [currentQuestions, setCurrentQuestions] = useState(generateQuestions(500));
   const [currentAnswers, setCurrentAnswers] = useState<Answer[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -41,6 +41,23 @@ function App() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+  
+  // Auto-generate more questions when getting close to the end
+  useEffect(() => {
+    const maxQuestionIndex = Math.max(
+      currentQuestionIndex,
+      ...currentAnswers.map(a => {
+        const qIndex = currentQuestions.findIndex(q => q.id === a.questionId);
+        return qIndex >= 0 ? qIndex : 0;
+      })
+    );
+    
+    // If we're within 100 questions of the end, generate 500 more
+    if (maxQuestionIndex >= currentQuestions.length - 100) {
+      console.log('Auto-generating more questions...');
+      setCurrentQuestions(prev => [...prev, ...generateQuestions(500)]);
+    }
+  }, [currentQuestionIndex, currentAnswers, currentQuestions.length]);
   
   // Auto-scroll to top when session changes
   useEffect(() => {
@@ -62,6 +79,8 @@ function App() {
   }, [testState.currentSession, previousSession, testState.isActive, isMobile]);
   
   const handleSessionComplete = useCallback(() => {
+    console.log('Session completing...');
+    
     // Calculate stats properly
     const answeredQuestions = currentAnswers.filter(a => a.answer !== '');
     const correctAnswers = currentAnswers.filter(a => a.isCorrect && a.answer !== '');
@@ -98,10 +117,9 @@ function App() {
     // Reset for next session
     if (testState.currentSession > 1) {
       // Generate new questions for next session
-      setCurrentQuestions(generateQuestions(2000));
+      setCurrentQuestions(generateQuestions(500));
       setCurrentAnswers([]);
       setCurrentQuestionIndex(0);
-      timer.reset(testState.config.sessionDuration);
     }
   }, [testState.currentSession, testState.config, currentQuestions, currentAnswers, currentQuestionIndex]);
   
@@ -111,7 +129,18 @@ function App() {
     testState.isActive && !testState.isCompleted
   );
   
+  // Update timer in test state for consistency
+  useEffect(() => {
+    if (testState.isActive && !testState.isCompleted) {
+      setTestState(prev => ({
+        ...prev,
+        timeRemaining: timer.timeRemaining
+      }));
+    }
+  }, [timer.timeRemaining, testState.isActive, testState.isCompleted]);
+  
   const handleStart = (config: TestConfig) => {
+    console.log('Starting test with config:', config);
     setTestState({
       isActive: true,
       currentSession: config.totalSessions,
@@ -123,7 +152,7 @@ function App() {
     setPreviousSession(config.totalSessions);
     setCurrentQuestionIndex(0);
     // Generate fresh questions for the test
-    setCurrentQuestions(generateQuestions(2000));
+    setCurrentQuestions(generateQuestions(500));
     setCurrentAnswers([]);
     timer.reset(config.sessionDuration);
     
@@ -210,38 +239,16 @@ function App() {
     }, 50);
   };
   
-  // Mobile keyboard handlers - Dynamic navigation
+  // Mobile keyboard handlers - Simple left to right, top to bottom navigation
   const handleMobileNumberPress = (number: string) => {
     if (currentQuestionIndex < currentQuestions.length) {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
       
-      // Left to right navigation for 3 columns
-      const currentColumn = Math.floor(currentQuestionIndex / 25);
-      const currentRow = currentQuestionIndex % 25;
-      
-      let nextQuestionIndex;
-      
-      if (currentColumn < 2) {
-        // Move to next column, same row
-        nextQuestionIndex = currentQuestionIndex + 25;
-      } else {
-        // At rightmost column, move to leftmost column next row
-        if (currentRow < 24) {
-          nextQuestionIndex = (currentRow + 1); // Next row, first column
-        } else {
-          // At bottom right of current 3-column set, move to next 3-column set
-          const currentColumnSet = Math.floor(currentColumn / 3);
-          nextQuestionIndex = (currentColumnSet + 1) * 3 * 25; // Next set, first column, first row
-        }
-      }
-      
-      // Auto-advance to next question
-      if (nextQuestionIndex < currentQuestions.length) {
-        setTimeout(() => {
-          setCurrentQuestionIndex(nextQuestionIndex);
-        }, 100);
-      }
+      // Simple increment to next question
+      setTimeout(() => {
+        setCurrentQuestionIndex(prev => Math.min(prev + 1, currentQuestions.length - 1));
+      }, 100);
     }
   };
   
@@ -268,7 +275,7 @@ function App() {
         totalSessions: 4
       }
     });
-    setCurrentQuestions(generateQuestions(2000));
+    setCurrentQuestions(generateQuestions(500));
     setCurrentAnswers([]);
     setCurrentQuestionIndex(0);
     setPreviousSession(0);
@@ -303,11 +310,6 @@ function App() {
   const correctAnswers = currentAnswers.filter(a => a.isCorrect && a.answer !== '');
   const corrections = currentAnswers.filter(a => a.wasChanged);
   const wrongAnswers = answeredQuestions.filter(a => !a.isCorrect && !a.wasChanged);
-  
-  // Calculate how many questions are visible/available for current view
-  const visibleQuestions = isMobile ? 
-    Math.min(75, currentQuestions.length) : // Mobile: 3 columns × 25 = 75 questions per view
-    Math.min(300, currentQuestions.length); // Desktop: 12 columns × 25 = 300 questions per view
   
   return (
     <div className={`min-h-screen bg-gray-100 p-2 md:p-4 ${isMobile ? 'pb-64' : ''}`}>
@@ -347,85 +349,101 @@ function App() {
               disabled={!testState.isActive || testState.isCompleted}
             />
           ) : (
-            /* Desktop Layout - Traditional Pauli Test Grid */
+            /* Desktop Layout - Traditional Pauli Test Grid with Auto-Expand */
             <div className="overflow-x-auto">
               <div className="flex gap-1 md:gap-2 justify-center" style={{ minWidth: 'fit-content' }}>
-                {Array.from({ length: 12 }, (_, colIndex) => (
-                  <div key={colIndex} className="flex flex-col gap-1">
-                    {/* Column header with numbers */}
-                    <div className="text-center text-xs text-gray-500 mb-1 h-4">
-                      {colIndex + 1}
-                    </div>
-                    
-                    {Array.from({ length: 25 }, (_, rowIndex) => {
-                      const questionIndex = colIndex * 25 + rowIndex;
-                      if (questionIndex >= currentQuestions.length) return null;
+                {/* Calculate how many columns we need based on current progress */}
+                {(() => {
+                  const maxQuestionIndex = Math.max(
+                    currentQuestionIndex,
+                    ...currentAnswers.map(a => {
+                      const qIndex = currentQuestions.findIndex(q => q.id === a.questionId);
+                      return qIndex >= 0 ? qIndex : 0;
+                    })
+                  );
+                  
+                  // Show at least 12 columns, but expand as needed
+                  const minColumns = 12;
+                  const neededColumns = Math.ceil((maxQuestionIndex + 1) / 25);
+                  const totalColumns = Math.max(minColumns, neededColumns + 2); // +2 for buffer
+                  
+                  return Array.from({ length: totalColumns }, (_, colIndex) => (
+                    <div key={colIndex} className="flex flex-col gap-1">
+                      {/* Column header with numbers */}
+                      <div className="text-center text-xs text-gray-500 mb-1 h-4">
+                        {colIndex + 1}
+                      </div>
                       
-                      const question = currentQuestions[questionIndex];
-                      const existingAnswer = currentAnswers.find(a => a.questionId === question.id);
-                      
-                      return (
-                        <div key={question.id} className="relative">
-                          {/* Row number on the left for first column */}
-                          {colIndex === 0 && (
-                            <div className="absolute -left-6 top-0 h-full flex items-center">
-                              <span className="text-xs text-gray-400 font-mono">
-                                {rowIndex + 1}
-                              </span>
-                            </div>
-                          )}
-                          
-                          <div className="bg-white border border-gray-300 flex">
-                            {/* Question numbers stacked vertically */}
-                            <div className="w-8 md:w-10 h-12 md:h-16 flex flex-col border-r border-gray-300">
-                              <div className="text-center text-xs md:text-sm font-mono py-0.5 md:py-1 border-b border-gray-200 flex-1 flex items-center justify-center">
-                                {question.num1}
+                      {Array.from({ length: 25 }, (_, rowIndex) => {
+                        const questionIndex = colIndex * 25 + rowIndex;
+                        if (questionIndex >= currentQuestions.length) return null;
+                        
+                        const question = currentQuestions[questionIndex];
+                        const existingAnswer = currentAnswers.find(a => a.questionId === question.id);
+                        
+                        return (
+                          <div key={question.id} className="relative">
+                            {/* Row number on the left for first column */}
+                            {colIndex === 0 && (
+                              <div className="absolute -left-6 top-0 h-full flex items-center">
+                                <span className="text-xs text-gray-400 font-mono">
+                                  {rowIndex + 1}
+                                </span>
                               </div>
-                              <div className="text-center text-xs md:text-sm font-mono py-0.5 md:py-1 flex-1 flex items-center justify-center">
-                                {question.num2}
-                              </div>
-                            </div>
+                            )}
                             
-                            {/* Answer input on the right */}
-                            <div className="w-8 md:w-10 h-12 md:h-16 relative">
-                              <input
-                                type="text"
-                                value={existingAnswer?.answer || ''}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  if (value.length > 1) return;
-                                  if (value !== '' && (isNaN(Number(value)) || Number(value) < 0 || Number(value) > 9)) return;
-                                  
-                                  handleAnswer(question.id, value);
-                                  
-                                  // Auto-focus to next input after entering a value
-                                  if (value !== '') {
-                                    handleEnterPressed(questionIndex);
-                                  }
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === 'ArrowDown') {
-                                    e.preventDefault();
-                                    handleEnterPressed(questionIndex);
-                                  }
-                                }}
-                                disabled={!testState.isActive || testState.isCompleted}
-                                maxLength={1}
-                                data-index={questionIndex}
-                                className="w-full h-full text-center font-mono text-xs md:text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400 focus:bg-blue-50"
-                                placeholder=""
-                              />
+                            <div className="bg-white border border-gray-300 flex">
+                              {/* Question numbers stacked vertically */}
+                              <div className="w-8 md:w-10 h-12 md:h-16 flex flex-col border-r border-gray-300">
+                                <div className="text-center text-xs md:text-sm font-mono py-0.5 md:py-1 border-b border-gray-200 flex-1 flex items-center justify-center">
+                                  {question.num1}
+                                </div>
+                                <div className="text-center text-xs md:text-sm font-mono py-0.5 md:py-1 flex-1 flex items-center justify-center">
+                                  {question.num2}
+                                </div>
+                              </div>
                               
-                              {existingAnswer?.wasChanged && (
-                                <div className="absolute -right-0.5 -top-0.5 w-1 h-1 md:w-1.5 md:h-1.5 bg-orange-500 rounded-full" />
-                              )}
+                              {/* Answer input on the right */}
+                              <div className="w-8 md:w-10 h-12 md:h-16 relative">
+                                <input
+                                  type="text"
+                                  value={existingAnswer?.answer || ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value.length > 1) return;
+                                    if (value !== '' && (isNaN(Number(value)) || Number(value) < 0 || Number(value) > 9)) return;
+                                    
+                                    handleAnswer(question.id, value);
+                                    
+                                    // Auto-focus to next input after entering a value
+                                    if (value !== '') {
+                                      handleEnterPressed(questionIndex);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                                      e.preventDefault();
+                                      handleEnterPressed(questionIndex);
+                                    }
+                                  }}
+                                  disabled={!testState.isActive || testState.isCompleted}
+                                  maxLength={1}
+                                  data-index={questionIndex}
+                                  className="w-full h-full text-center font-mono text-xs md:text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400 focus:bg-blue-50"
+                                  placeholder=""
+                                />
+                                
+                                {existingAnswer?.wasChanged && (
+                                  <div className="absolute -right-0.5 -top-0.5 w-1 h-1 md:w-1.5 md:h-1.5 bg-orange-500 rounded-full" />
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
+                        );
+                      })}
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
           )}
