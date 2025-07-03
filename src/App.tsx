@@ -240,6 +240,13 @@ function App() {
     }
   };
   
+  const handleMobileDelete = () => {
+    if (currentQuestionIndex < currentQuestions.length) {
+      const question = currentQuestions[currentQuestionIndex];
+      handleAnswer(question.id, '');
+    }
+  };
+  
   const handleQuestionChange = (index: number) => {
     setCurrentQuestionIndex(index);
   };
@@ -443,7 +450,10 @@ function App() {
         
         {/* Mobile Custom Keyboard */}
         {isMobile && testState.isActive && !testState.isCompleted && (
-          <MobileKeyboard onNumberPress={handleMobileNumberPress} />
+          <MobileKeyboard
+            onNumberPress={handleMobileNumberPress}
+            onDelete={handleMobileDelete}
+          />
         )}
       </div>
     </div>

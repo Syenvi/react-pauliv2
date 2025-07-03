@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Question, Answer } from '../types/test';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface MobileQuestionGridProps {
   questions: Question[];
@@ -19,21 +18,10 @@ export function MobileQuestionGrid({
   onQuestionChange,
   disabled 
 }: MobileQuestionGridProps) {
-  const [currentColumnPair, setCurrentColumnPair] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   const questionsPerColumn = 25;
   const totalColumns = 12;
-  const columnsPerPage = 2; // Show 2 columns at a time
-  const totalPages = Math.ceil(totalColumns / columnsPerPage);
-  
-  // Auto-scroll to current question's column pair
-  useEffect(() => {
-    const targetColumnPair = Math.floor(Math.floor(currentQuestionIndex / questionsPerColumn) / columnsPerPage);
-    if (targetColumnPair !== currentColumnPair) {
-      setCurrentColumnPair(targetColumnPair);
-    }
-  }, [currentQuestionIndex, questionsPerColumn, columnsPerPage, currentColumnPair]);
   
   // Auto-scroll to focused question
   useEffect(() => {
@@ -47,7 +35,7 @@ export function MobileQuestionGrid({
         });
       }
     }
-  }, [currentQuestionIndex, currentColumnPair]);
+  }, [currentQuestionIndex]);
   
   const handleQuestionClick = (questionIndex: number) => {
     if (!disabled) {
@@ -55,175 +43,77 @@ export function MobileQuestionGrid({
     }
   };
   
-  const handleAnswer = (questionId: string, answer: string, questionIndex: number) => {
-    onAnswer(questionId, answer);
-    
-    // Auto-advance logic: left-right-left-right pattern
-    if (answer !== '') {
-      const currentColumn = Math.floor(questionIndex / questionsPerColumn);
-      const currentRow = questionIndex % questionsPerColumn;
-      const currentColumnPairIndex = Math.floor(currentColumn / columnsPerPage);
-      const columnInPair = currentColumn % columnsPerPage; // 0 for left, 1 for right
-      
-      let nextQuestionIndex;
-      
-      if (columnInPair === 0) {
-        // Currently on left column, move to right column same row
-        nextQuestionIndex = questionIndex + questionsPerColumn;
-      } else {
-        // Currently on right column, move to left column next row
-        if (currentRow < questionsPerColumn - 1) {
-          // Move to next row, left column
-          nextQuestionIndex = questionIndex - questionsPerColumn + 1;
-        } else {
-          // At bottom of right column, move to next column pair, top left
-          if (currentColumnPairIndex < totalPages - 1) {
-            nextQuestionIndex = (currentColumnPairIndex + 1) * columnsPerPage * questionsPerColumn;
-            setCurrentColumnPair(currentColumnPairIndex + 1);
-          } else {
-            // Stay at current position if at the end
-            nextQuestionIndex = questionIndex;
-          }
-        }
-      }
-      
-      // Ensure we don't go beyond available questions
-      if (nextQuestionIndex < questions.length) {
-        setTimeout(() => {
-          onQuestionChange(nextQuestionIndex);
-        }, 100);
-      }
-    }
-  };
-  
-  const nextPage = () => {
-    if (currentColumnPair < totalPages - 1) {
-      setCurrentColumnPair(currentColumnPair + 1);
-      // Move focus to first question of new column pair
-      const newFocusIndex = (currentColumnPair + 1) * columnsPerPage * questionsPerColumn;
-      if (newFocusIndex < questions.length) {
-        onQuestionChange(newFocusIndex);
-      }
-    }
-  };
-  
-  const prevPage = () => {
-    if (currentColumnPair > 0) {
-      setCurrentColumnPair(currentColumnPair - 1);
-      // Move focus to first question of previous column pair
-      const newFocusIndex = (currentColumnPair - 1) * columnsPerPage * questionsPerColumn;
-      onQuestionChange(newFocusIndex);
-    }
-  };
-  
-  const startColumnIndex = currentColumnPair * columnsPerPage;
-  const endColumnIndex = Math.min(startColumnIndex + columnsPerPage, totalColumns);
-  
   return (
     <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-      {/* Page Navigation */}
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={prevPage}
-          disabled={currentColumnPair === 0}
-          className="flex items-center gap-1 px-3 py-2 bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span className="text-sm">Prev</span>
-        </button>
-        
-        <div className="text-center">
-          <div className="text-sm font-semibold text-gray-700">
-            Kolom {startColumnIndex + 1}-{endColumnIndex}
-          </div>
-          <div className="text-xs text-gray-500">
-            Halaman {currentColumnPair + 1} dari {totalPages}
-          </div>
-        </div>
-        
-        <button
-          onClick={nextPage}
-          disabled={currentColumnPair === totalPages - 1}
-          className="flex items-center gap-1 px-3 py-2 bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <span className="text-sm">Next</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-      
-      {/* Questions Grid - Exact same layout as desktop but only 2 columns */}
-      <div className="overflow-x-auto" ref={scrollContainerRef}>
-        <div className="flex gap-2 justify-center" style={{ minWidth: 'fit-content' }}>
-          {Array.from({ length: endColumnIndex - startColumnIndex }, (_, colIndex) => {
-            const actualColumnIndex = startColumnIndex + colIndex;
-            
-            return (
-              <div key={actualColumnIndex} className="flex flex-col gap-1">
-                {/* Column header with numbers */}
-                <div className="text-center text-sm text-gray-500 mb-1 h-6 font-semibold">
-                  {actualColumnIndex + 1}
-                </div>
+      {/* Questions Grid - All columns displayed, scrollable */}
+      <div className="overflow-x-auto overflow-y-visible" ref={scrollContainerRef}>
+        <div className="flex gap-2 justify-start" style={{ minWidth: 'fit-content' }}>
+          {Array.from({ length: totalColumns }, (_, colIndex) => (
+            <div key={colIndex} className="flex flex-col gap-1">
+              {/* Column header with numbers */}
+              <div className="text-center text-sm text-gray-500 mb-1 h-6 font-semibold">
+                {colIndex + 1}
+              </div>
+              
+              {Array.from({ length: questionsPerColumn }, (_, rowIndex) => {
+                const questionIndex = colIndex * questionsPerColumn + rowIndex;
+                if (questionIndex >= questions.length) return null;
                 
-                {Array.from({ length: questionsPerColumn }, (_, rowIndex) => {
-                  const questionIndex = actualColumnIndex * questionsPerColumn + rowIndex;
-                  if (questionIndex >= questions.length) return null;
-                  
-                  const question = questions[questionIndex];
-                  const existingAnswer = answers.find(a => a.questionId === question.id);
-                  const isFocused = questionIndex === currentQuestionIndex;
-                  
-                  return (
-                    <div key={question.id} className="relative" data-question-index={questionIndex}>
-                      {/* Row number on the left for first column of the pair */}
-                      {colIndex === 0 && (
-                        <div className="absolute -left-8 top-0 h-full flex items-center">
-                          <span className="text-sm text-gray-400 font-mono">
-                            {rowIndex + 1}
-                          </span>
+                const question = questions[questionIndex];
+                const existingAnswer = answers.find(a => a.questionId === question.id);
+                const isFocused = questionIndex === currentQuestionIndex;
+                
+                return (
+                  <div key={question.id} className="relative" data-question-index={questionIndex}>
+                    {/* Row number on the left for first column */}
+                    {colIndex === 0 && (
+                      <div className="absolute -left-8 top-0 h-full flex items-center">
+                        <span className="text-sm text-gray-400 font-mono">
+                          {rowIndex + 1}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div 
+                      className={`border-2 flex cursor-pointer transition-all duration-200 ${
+                        isFocused 
+                          ? 'border-blue-500 bg-blue-50 shadow-lg' 
+                          : 'border-gray-300 bg-white hover:border-gray-400'
+                      }`}
+                      onClick={() => handleQuestionClick(questionIndex)}
+                    >
+                      {/* Question numbers stacked vertically */}
+                      <div className="w-12 h-20 flex flex-col border-r border-gray-300">
+                        <div className="text-center text-sm font-mono py-1 border-b border-gray-200 flex-1 flex items-center justify-center">
+                          {question.num1}
                         </div>
-                      )}
-                      
-                      <div 
-                        className={`border-2 flex cursor-pointer transition-all duration-200 ${
-                          isFocused 
-                            ? 'border-blue-500 bg-blue-50 shadow-lg' 
-                            : 'border-gray-300 bg-white hover:border-gray-400'
-                        }`}
-                        onClick={() => handleQuestionClick(questionIndex)}
-                      >
-                        {/* Question numbers stacked vertically */}
-                        <div className="w-12 h-20 flex flex-col border-r border-gray-300">
-                          <div className="text-center text-sm font-mono py-1 border-b border-gray-200 flex-1 flex items-center justify-center">
-                            {question.num1}
-                          </div>
-                          <div className="text-center text-sm font-mono py-1 flex-1 flex items-center justify-center">
-                            {question.num2}
-                          </div>
-                        </div>
-                        
-                        {/* Answer display - show current answer or empty */}
-                        <div className="w-12 h-20 relative flex items-center justify-center">
-                          <div className="text-xl font-mono font-bold text-gray-700">
-                            {existingAnswer?.answer || ''}
-                          </div>
-                          
-                          {/* Only show correction indicator */}
-                          {existingAnswer?.wasChanged && (
-                            <div className="absolute -right-0.5 -top-0.5 w-1.5 h-1.5 bg-orange-500 rounded-full" />
-                          )}
-                          
-                          {/* Focus indicator */}
-                          {isFocused && (
-                            <div className="absolute inset-0 border-2 border-blue-400 rounded-sm animate-pulse" />
-                          )}
+                        <div className="text-center text-sm font-mono py-1 flex-1 flex items-center justify-center">
+                          {question.num2}
                         </div>
                       </div>
+                      
+                      {/* Answer display - show current answer or empty */}
+                      <div className="w-12 h-20 relative flex items-center justify-center">
+                        <div className="text-xl font-mono font-bold text-gray-700">
+                          {existingAnswer?.answer || ''}
+                        </div>
+                        
+                        {/* Only show correction indicator */}
+                        {existingAnswer?.wasChanged && (
+                          <div className="absolute -right-0.5 -top-0.5 w-1.5 h-1.5 bg-orange-500 rounded-full" />
+                        )}
+                        
+                        {/* Focus indicator */}
+                        {isFocused && (
+                          <div className="absolute inset-0 border-2 border-blue-400 rounded-sm animate-pulse" />
+                        )}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
       
