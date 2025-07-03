@@ -221,10 +221,7 @@ function App() {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
       
-      // Auto-advance to next question
-      setTimeout(() => {
-        handleMobileNext();
-      }, 100);
+      // The auto-advance is now handled in MobileQuestionGrid
     }
   };
   
@@ -236,6 +233,7 @@ function App() {
   };
   
   const handleMobileNext = () => {
+    // Manual next - move to next question without answering
     if (currentQuestionIndex < currentQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
@@ -317,7 +315,7 @@ function App() {
               Sesi {testState.config.totalSessions - testState.currentSession + 1}
             </h2>
             <p className="text-sm md:text-base text-gray-600">
-              {isMobile ? 'Pilih soal dan gunakan keyboard di bawah' : 'Kerjakan dari atas ke bawah, kolom demi kolom'}
+              {isMobile ? 'Ketuk soal untuk memilih, gunakan keyboard di bawah' : 'Kerjakan dari atas ke bawah, kolom demi kolom'}
             </p>
             <p className="text-xs text-gray-500">
               {Math.floor(testState.config.sessionDuration / 60) > 0 && `${Math.floor(testState.config.sessionDuration / 60)}m `}
@@ -330,7 +328,15 @@ function App() {
             <MobileQuestionGrid
               questions={currentQuestions}
               answers={currentAnswers}
-              onAnswer={handleAnswer}
+              onAnswer={(questionId, answer) => {
+                const questionIndex = currentQuestions.findIndex(q => q.id === questionId);
+                handleAnswer(questionId, answer);
+                
+                // Handle auto-advance in the component itself
+                if (answer !== '' && questionIndex >= 0) {
+                  // The auto-advance logic is now in MobileQuestionGrid
+                }
+              }}
               currentQuestionIndex={currentQuestionIndex}
               onQuestionChange={handleQuestionChange}
               disabled={!testState.isActive || testState.isCompleted}
