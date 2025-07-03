@@ -203,6 +203,40 @@ function App() {
     if (currentQuestionIndex < currentQuestions.length) {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
+      
+      // Auto-advance to next question
+      const currentColumn = Math.floor(currentQuestionIndex / 25);
+      const currentRow = currentQuestionIndex % 25;
+      const columnInPair = currentColumn % 2; // 0 for left, 1 for right
+      
+      let nextQuestionIndex;
+      
+      if (columnInPair === 0) {
+        // Currently on left column, move to right column same row
+        nextQuestionIndex = currentQuestionIndex + 25;
+      } else {
+        // Currently on right column, move to left column next row
+        if (currentRow < 24) {
+          // Move to next row, left column
+          nextQuestionIndex = currentQuestionIndex - 25 + 1;
+        } else {
+          // At bottom of right column, move to next column pair, top left
+          const currentColumnPair = Math.floor(currentColumn / 2);
+          if (currentColumnPair < 5) { // 12 columns = 6 pairs
+            nextQuestionIndex = (currentColumnPair + 1) * 2 * 25;
+          } else {
+            // Stay at current position if at the end
+            nextQuestionIndex = currentQuestionIndex;
+          }
+        }
+      }
+      
+      // Ensure we don't go beyond available questions
+      if (nextQuestionIndex < currentQuestions.length) {
+        setTimeout(() => {
+          setCurrentQuestionIndex(nextQuestionIndex);
+        }, 100);
+      }
     }
   };
   
@@ -265,6 +299,7 @@ function App() {
           timeRemaining={timer.timeRemaining} 
           currentSession={testState.currentSession}
           totalSessions={testState.config.totalSessions}
+          sessionDuration={testState.config.sessionDuration}
         />
         
         <div className="bg-white rounded-lg shadow-lg p-3 md:p-6 mb-4">
@@ -273,7 +308,7 @@ function App() {
               Sesi {testState.config.totalSessions - testState.currentSession + 1}
             </h2>
             <p className="text-sm md:text-base text-gray-600">
-              {isMobile ? 'Gunakan keyboard di bawah untuk mengisi jawaban' : 'Kerjakan dari atas ke bawah, kolom demi kolom'}
+              {isMobile ? 'Ketuk soal untuk memilih, gunakan keyboard di bawah' : 'Kerjakan dari atas ke bawah, kolom demi kolom'}
             </p>
             <p className="text-xs text-gray-500">
               {Math.floor(testState.config.sessionDuration / 60) > 0 && `${Math.floor(testState.config.sessionDuration / 60)}m `}

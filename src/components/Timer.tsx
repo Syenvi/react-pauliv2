@@ -5,18 +5,17 @@ interface TimerProps {
   timeRemaining: number;
   currentSession: number;
   totalSessions: number;
+  sessionDuration: number;
 }
 
-export function Timer({ timeRemaining, currentSession, totalSessions }: TimerProps) {
+export function Timer({ timeRemaining, currentSession, totalSessions, sessionDuration }: TimerProps) {
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = timeRemaining % 60;
   
   // Calculate progress based on current session
   const sessionProgress = ((totalSessions - currentSession) / totalSessions) * 100;
   
-  // Calculate time progress for current session (assuming each session has same duration)
-  // We need to get the session duration from somewhere - let's calculate it
-  const sessionDuration = 30; // This should ideally come from props or context
+  // Calculate time progress for current session
   const timeProgress = ((sessionDuration - timeRemaining) / sessionDuration) * 100;
   
   return (

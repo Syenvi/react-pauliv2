@@ -49,6 +49,12 @@ export function MobileQuestionGrid({
     }
   }, [currentQuestionIndex, currentColumnPair]);
   
+  const handleQuestionClick = (questionIndex: number) => {
+    if (!disabled) {
+      onQuestionChange(questionIndex);
+    }
+  };
+  
   const handleAnswer = (questionId: string, answer: string, questionIndex: number) => {
     onAnswer(questionId, answer);
     
@@ -177,11 +183,14 @@ export function MobileQuestionGrid({
                         </div>
                       )}
                       
-                      <div className={`border-2 flex transition-all duration-200 ${
-                        isFocused 
-                          ? 'border-blue-500 bg-blue-50 shadow-lg' 
-                          : 'border-gray-300 bg-white'
-                      }`}>
+                      <div 
+                        className={`border-2 flex cursor-pointer transition-all duration-200 ${
+                          isFocused 
+                            ? 'border-blue-500 bg-blue-50 shadow-lg' 
+                            : 'border-gray-300 bg-white hover:border-gray-400'
+                        }`}
+                        onClick={() => handleQuestionClick(questionIndex)}
+                      >
                         {/* Question numbers stacked vertically */}
                         <div className="w-12 h-20 flex flex-col border-r border-gray-300">
                           <div className="text-center text-sm font-mono py-1 border-b border-gray-200 flex-1 flex items-center justify-center">
@@ -192,28 +201,20 @@ export function MobileQuestionGrid({
                           </div>
                         </div>
                         
-                        {/* Answer input - same as desktop */}
-                        <div className="w-12 h-20 relative">
-                          <input
-                            type="text"
-                            value={existingAnswer?.answer || ''}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (value.length > 1) return;
-                              if (value !== '' && (isNaN(Number(value)) || Number(value) < 0 || Number(value) > 9)) return;
-                              
-                              handleAnswer(question.id, value, questionIndex);
-                            }}
-                            disabled={disabled}
-                            maxLength={1}
-                            className="w-full h-full text-center font-mono text-sm border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-400 focus:bg-blue-50"
-                            placeholder=""
-                            style={{ fontSize: '16px' }} // Prevent zoom on iOS
-                          />
+                        {/* Answer display - show current answer or empty */}
+                        <div className="w-12 h-20 relative flex items-center justify-center">
+                          <div className="text-xl font-mono font-bold text-gray-700">
+                            {existingAnswer?.answer || ''}
+                          </div>
                           
                           {/* Only show correction indicator */}
                           {existingAnswer?.wasChanged && (
                             <div className="absolute -right-0.5 -top-0.5 w-1.5 h-1.5 bg-orange-500 rounded-full" />
+                          )}
+                          
+                          {/* Focus indicator */}
+                          {isFocused && (
+                            <div className="absolute inset-0 border-2 border-blue-400 rounded-sm animate-pulse" />
                           )}
                         </div>
                       </div>
