@@ -239,16 +239,39 @@ function App() {
     }, 50);
   };
   
-  // Mobile keyboard handlers - Simple left to right, top to bottom navigation
+  // Mobile keyboard handlers - Horizontal navigation (left to right)
   const handleMobileNumberPress = (number: string) => {
     if (currentQuestionIndex < currentQuestions.length) {
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
       
-      // Simple increment to next question
-      setTimeout(() => {
-        setCurrentQuestionIndex(prev => Math.min(prev + 1, currentQuestions.length - 1));
-      }, 100);
+      // Mobile navigation: left to right, then next row
+      const questionsPerColumn = 25;
+      const currentColumn = Math.floor(currentQuestionIndex / questionsPerColumn);
+      const currentRow = currentQuestionIndex % questionsPerColumn;
+      
+      let nextQuestionIndex;
+      
+      // Move to next column (right), same row
+      if (currentColumn < 2) { // We have 3 columns (0, 1, 2)
+        nextQuestionIndex = currentQuestionIndex + questionsPerColumn;
+      } else {
+        // At rightmost column, move to leftmost column next row
+        if (currentRow < 24) { // Not at bottom row
+          nextQuestionIndex = (currentRow + 1); // Next row, first column (column 0)
+        } else {
+          // At bottom right, move to next set of 3 columns
+          const currentColumnSet = Math.floor(currentColumn / 3);
+          nextQuestionIndex = (currentColumnSet + 1) * 3 * 25; // Next set, first column, first row
+        }
+      }
+      
+      // Auto-advance to next question
+      if (nextQuestionIndex < currentQuestions.length) {
+        setTimeout(() => {
+          setCurrentQuestionIndex(nextQuestionIndex);
+        }, 100);
+      }
     }
   };
   
@@ -327,7 +350,7 @@ function App() {
               Sesi {testState.config.totalSessions - testState.currentSession + 1}
             </h2>
             <p className="text-sm md:text-base text-gray-600">
-              {isMobile ? 'Ketuk soal untuk memilih, gunakan keyboard di bawah' : 'Kerjakan dari atas ke bawah, kolom demi kolom'}
+              {isMobile ? 'Ketuk soal untuk memilih, isi dari kiri ke kanan' : 'Kerjakan dari atas ke bawah, kolom demi kolom'}
             </p>
             <p className="text-xs text-gray-500">
               {Math.floor(testState.config.sessionDuration / 60) > 0 && `${Math.floor(testState.config.sessionDuration / 60)}m `}

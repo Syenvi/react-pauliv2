@@ -35,15 +35,26 @@ export function MobileQuestionGrid({
   // Adjust current question index for the visible set
   const adjustedCurrentIndex = currentQuestionIndex - actualStartIndex;
   
-  // Auto-scroll to focused question
+  // Auto-scroll to focused question with better centering
   useEffect(() => {
     if (scrollContainerRef.current && adjustedCurrentIndex >= 0 && adjustedCurrentIndex < visibleQuestions.length) {
       const focusedElement = scrollContainerRef.current.querySelector(`[data-question-index="${adjustedCurrentIndex}"]`);
       if (focusedElement) {
-        focusedElement.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center',
-          inline: 'center'
+        // Calculate the position to center the element
+        const container = scrollContainerRef.current;
+        const elementRect = focusedElement.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        // Calculate scroll position to center the element
+        const elementTop = focusedElement.offsetTop;
+        const elementHeight = elementRect.height;
+        const containerHeight = containerRect.height;
+        
+        const scrollTop = elementTop - (containerHeight / 2) + (elementHeight / 2);
+        
+        container.scrollTo({
+          top: Math.max(0, scrollTop),
+          behavior: 'smooth'
         });
       }
     }
@@ -153,10 +164,10 @@ export function MobileQuestionGrid({
       
       {/* Navigation Instructions */}
       <div className="mt-3 text-center text-xs text-gray-600 bg-blue-50 rounded-lg p-2">
-        <div className="font-semibold mb-1">Pola Pengisian:</div>
+        <div className="font-semibold mb-1">Pola Pengisian Mobile:</div>
         <div>Kiri → Tengah → Kanan → Kiri (baris berikutnya)</div>
         <div className="text-xs text-gray-500 mt-1">
-          Kerjakan sebanyak mungkin dalam waktu yang tersedia
+          Ketuk soal untuk memilih, gunakan keyboard di bawah
         </div>
       </div>
     </div>
