@@ -198,17 +198,33 @@ function App() {
     }, 50);
   };
   
-  // Mobile keyboard handlers - Fixed navigation logic
+  // Mobile keyboard handlers - Left to right navigation for 3 columns
   const handleMobileNumberPress = (number: string) => {
-    if (currentQuestionIndex < currentQuestions.length) {
+    if (currentQuestionIndex < 75) { // Only 3 columns × 25 rows = 75 questions for mobile
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, number);
       
-      // Simple sequential navigation for mobile
-      const nextQuestionIndex = currentQuestionIndex + 1;
+      // Left to right navigation for 3 columns
+      const currentColumn = Math.floor(currentQuestionIndex / 25);
+      const currentRow = currentQuestionIndex % 25;
       
-      // Ensure we don't go beyond available questions
-      if (nextQuestionIndex < currentQuestions.length) {
+      let nextQuestionIndex;
+      
+      if (currentColumn < 2) {
+        // Move to next column, same row
+        nextQuestionIndex = currentQuestionIndex + 25;
+      } else {
+        // At rightmost column, move to leftmost column next row
+        if (currentRow < 24) {
+          nextQuestionIndex = (currentRow + 1); // Next row, first column
+        } else {
+          // At bottom right, stay at current position
+          nextQuestionIndex = currentQuestionIndex;
+        }
+      }
+      
+      // Ensure we don't go beyond available questions for mobile (75 questions)
+      if (nextQuestionIndex < 75) {
         setTimeout(() => {
           setCurrentQuestionIndex(nextQuestionIndex);
         }, 100);
@@ -217,7 +233,7 @@ function App() {
   };
   
   const handleMobileDelete = () => {
-    if (currentQuestionIndex < currentQuestions.length) {
+    if (currentQuestionIndex < 75) { // Only for mobile's 75 questions
       const question = currentQuestions[currentQuestionIndex];
       handleAnswer(question.id, '');
     }
@@ -302,7 +318,7 @@ function App() {
           {/* Mobile Layout */}
           {isMobile ? (
             <MobileQuestionGrid
-              questions={currentQuestions}
+              questions={currentQuestions.slice(0, 75)} // Only show first 75 questions (3 columns × 25 rows)
               answers={currentAnswers}
               onAnswer={handleAnswer}
               currentQuestionIndex={currentQuestionIndex}
